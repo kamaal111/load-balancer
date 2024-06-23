@@ -1,0 +1,7 @@
+# List available commands
+default:
+    just --list --unsorted --list-heading $'Available commands\n'
+
+# Start load balancer
+start:
+    swift run

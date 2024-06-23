@@ -1,0 +1,27 @@
+# List available commands
+default:
+    just --list --unsorted --list-heading $'Available commands\n'
+
+# Start service 1
+start-1:
+    just start 3001
+
+# Start service 2
+start-2:
+    just start 3002
+
+# Start service 3
+start-3:
+    just start 3003
+
+# Start service 4
+start-4:
+    just start 3004
+
+[private]
+start port:
+    #!/bin/zsh
+
+    export SERVER_ADDRESS="127.0.0.1:{{ port }}"
+
+    go run *.go
