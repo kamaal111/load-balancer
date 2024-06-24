@@ -8,27 +8,52 @@
 import Vapor
 import Foundation
 
+private let SERVICES = [
+    "http://127.0.0.1:3001",
+    "http://127.0.0.1:3002",
+    "http://127.0.0.1:3003",
+    "http://127.0.0.1:3004",
+]
+
 struct LoadBalancerMiddleware: AsyncMiddleware {
     func respond(to request: Request, chainingTo next: any AsyncResponder) async throws -> Response {
-        let urlRequest = URLRequest(url: URL(string: "http://127.0.0.1:3001/ping")!)
-        let (data, urlResponse) = try await URLSession.shared.data(for: urlRequest)
-        guard let urlResponse = urlResponse as? HTTPURLResponse else {
-            throw Abort(.internalServerError)
-        }
+        let serviceIndex = await State.shared.incrementAndGetPreviousRequestCount() % SERVICES.count
+        let urlRequest = URLRequest(url: URL(string: "\(SERVICES[serviceIndex])\(request.url.path)")!)
+        let (data, response) = try await URLSession.shared.data(for: urlRequest)
+        guard let response = response as? HTTPURLResponse else { throw Abort(.internalServerError) }
 
-        let responseHeaders = urlResponse.allHeaderFields
+        let headers = response.allHeaderFields
             .compactMap({ key, value -> (key: String, value: String)? in
                 guard let key = key as? String else { return nil }
                 guard let value = value as? String else { return nil }
 
                 return (key, value)
             })
-        let response = Response(
-            status: .custom(code: UInt(urlResponse.statusCode), reasonPhrase: ""),
+        return Response(
+            status: .custom(code: UInt(response.statusCode), reasonPhrase: ""),
             version: request.version,
-            headers: HTTPHeaders(responseHeaders),
+            headers: HTTPHeaders(headers),
             body: .init(data: data)
         )
-        return response
     }
+}
+
+private actor State {
+    var requestCount: Int
+
+    init() {
+        self.requestCount = 0
+    }
+
+    func incrementAndGetPreviousRequestCount() -> Int {
+        let requestCount = requestCount
+        incrementRequestCount()
+        return requestCount
+    }
+
+    private func incrementRequestCount() {
+        requestCount += 1
+    }
+
+    static let shared = State()
 }
